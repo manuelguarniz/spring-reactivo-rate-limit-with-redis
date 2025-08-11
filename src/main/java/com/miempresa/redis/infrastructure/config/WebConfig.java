@@ -1,24 +1,28 @@
 package com.miempresa.redis.infrastructure.config;
 
-import com.miempresa.redis.infrastructure.adapter.in.web.interceptor.RateLimitInterceptor;
+import com.miempresa.redis.infrastructure.adapter.in.web.interceptor.RateLimitWebFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.core.Ordered;
+import org.springframework.web.server.WebFilter;
 
 /**
- * Configuración web para interceptores y otros aspectos de la capa web
+ * Configuración web para WebFlux con filtros y otros aspectos de la capa web
+ * reactiva
  */
 @Configuration
 @RequiredArgsConstructor
-public class WebConfig implements WebMvcConfigurer {
+public class WebConfig {
 
-  private final RateLimitInterceptor rateLimitInterceptor;
+  private final RateLimitWebFilter rateLimitWebFilter;
 
-  @Override
-  public void addInterceptors(InterceptorRegistry registry) {
-    registry.addInterceptor(rateLimitInterceptor)
-        .addPathPatterns("/api/**") // Aplicar a todos los endpoints de API
-        .excludePathPatterns("/api/admin/**"); // Excluir endpoints de administración del rate limiting
+  /**
+   * Configura el filtro de rate limiting para WebFlux
+   * Se aplica a todos los endpoints de API excepto los de administración
+   */
+  @Bean
+  public WebFilter rateLimitFilter() {
+    return rateLimitWebFilter;
   }
 }

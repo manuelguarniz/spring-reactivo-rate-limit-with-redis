@@ -14,6 +14,9 @@ public class RateLimitConfig {
   private int timeWindowSeconds;
   private boolean enabled;
 
+  @Builder.Default
+  private int lockTimeout = 5000; // Timeout por defecto en milisegundos
+
   public boolean isRateLimitEnabled() {
     return enabled;
   }

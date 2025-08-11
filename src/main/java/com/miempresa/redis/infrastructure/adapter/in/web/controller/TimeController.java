@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Mono;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -12,7 +13,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Controlador para operaciones relacionadas con el tiempo
+ * Controlador reactivo para operaciones relacionadas con el tiempo
  */
 @Slf4j
 @RestController
@@ -20,7 +21,7 @@ import java.util.Map;
 public class TimeController {
 
   @GetMapping("/time")
-  public ResponseEntity<Map<String, Object>> getCurrentTime() {
+  public Mono<ResponseEntity<Map<String, Object>>> getCurrentTime() {
     log.debug("Time request received");
 
     Map<String, Object> response = new HashMap<>();
@@ -34,6 +35,6 @@ public class TimeController {
     response.put("message", "Current server time");
 
     log.debug("Time response generated: {}", now.format(formatter));
-    return ResponseEntity.ok(response);
+    return Mono.just(ResponseEntity.ok(response));
   }
 }

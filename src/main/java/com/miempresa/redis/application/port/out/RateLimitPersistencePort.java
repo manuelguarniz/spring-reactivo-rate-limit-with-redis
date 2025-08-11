@@ -2,11 +2,12 @@ package com.miempresa.redis.application.port.out;
 
 import com.miempresa.redis.domain.model.RateLimitConfig;
 import com.miempresa.redis.domain.model.RequestInfo;
+import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 
 /**
- * Puerto de salida para la persistencia del rate limiting
+ * Puerto de salida reactivo para la persistencia del rate limiting
  */
 public interface RateLimitPersistencePort {
 
@@ -14,37 +15,40 @@ public interface RateLimitPersistencePort {
    * Obtiene el contador actual de requests para un endpoint e IP
    * 
    * @param requestInfo Información de la request
-   * @return Número actual de requests o 0 si no existe
+   * @return Mono<Integer> número actual de requests o 0 si no existe
    */
-  int getCurrentRequestCount(RequestInfo requestInfo);
+  Mono<Integer> getCurrentRequestCount(RequestInfo requestInfo);
 
   /**
    * Incrementa el contador de requests
    * 
    * @param requestInfo       Información de la request
    * @param timeWindowSeconds Ventana de tiempo para el TTL
+   * @return Mono<Void> operación completada
    */
-  void incrementRequestCount(RequestInfo requestInfo, int timeWindowSeconds);
+  Mono<Void> incrementRequestCount(RequestInfo requestInfo, int timeWindowSeconds);
 
   /**
    * Obtiene la configuración de rate limiting para un endpoint
    * 
    * @param endpoint Endpoint a consultar
-   * @return Configuración o null si no existe
+   * @return Mono<RateLimitConfig> configuración o empty si no existe
    */
-  RateLimitConfig getConfiguration(String endpoint);
+  Mono<RateLimitConfig> getConfiguration(String endpoint);
 
   /**
    * Guarda la configuración de rate limiting para un endpoint
    * 
    * @param config Configuración a guardar
+   * @return Mono<Void> operación completada
    */
-  void saveConfiguration(RateLimitConfig config);
+  Mono<Void> saveConfiguration(RateLimitConfig config);
 
   /**
    * Limpia los datos de rate limiting para un endpoint
    * 
    * @param endpoint Endpoint a limpiar
+   * @return Mono<Void> operación completada
    */
-  void clearRateLimitData(String endpoint);
+  Mono<Void> clearRateLimitData(String endpoint);
 }

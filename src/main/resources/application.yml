@@ -14,6 +14,24 @@ spring:
       port: 6379
       # No password required for localhost
 
+# Configuración de Redisson
+redisson:
+  connection-pool-size: 64
+  connection-minimum-idle: 24
+  lock-watchdog-timeout: 30000
+  rate-limit:
+    lock-timeout: 5000
+    cache-ttl: 600
+
+# Configuración de rate limiting por defecto
+rate-limit:
+  endpoints:
+    "/api/health":
+      max-requests: 5
+      time-window-seconds: 60
+      enabled: true
+      lock-timeout: 5000
+
 # Logging Configuration
 logging:
   level:

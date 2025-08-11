@@ -15,7 +15,7 @@
   <artifactId>redis-rate-limit</artifactId>
   <version>1.0.0</version>
   <name>redis-rate-limit</name>
-  <description>Spring Boot application with Redis-based rate limiting using hexagonal architecture</description>
+  <description>Spring Boot WebFlux application with Redis-based rate limiting using hexagonal architecture</description>
 
   <properties>
     <java.version>17</java.version>
@@ -28,17 +28,29 @@
     <!-- Spring Boot Starters -->
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-web</artifactId>
+      <artifactId>spring-boot-starter-webflux</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
-      <artifactId>spring-boot-starter-data-redis</artifactId>
+      <artifactId>spring-boot-starter-data-redis-reactive</artifactId>
     </dependency>
 
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-actuator</artifactId>
+    </dependency>
+
+    <!-- Project Reactor para programación reactiva -->
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-core</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-test</artifactId>
+      <scope>test</scope>
     </dependency>
 
     <!-- Redis Client -->
@@ -71,6 +83,13 @@
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers</artifactId>
       <scope>test</scope>
+    </dependency>
+
+    <!-- Redisson para funcionalidades avanzadas de Redis -->
+    <dependency>
+      <groupId>org.redisson</groupId>
+      <artifactId>redisson-spring-boot-starter</artifactId>
+      <version>3.24.3</version>
     </dependency>
   </dependencies>
 

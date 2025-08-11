@@ -8,9 +8,11 @@ import com.miempresa.redis.domain.service.UrlNormalizationService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import reactor.core.publisher.Mono;
 
 /**
- * Servicio de aplicación que implementa el caso de uso de rate limiting
+ * Servicio de aplicación reactivo que implementa el caso de uso de rate
+ * limiting
  */
 @Slf4j
 @Service
@@ -21,7 +23,7 @@ public class RateLimitService implements RateLimitUseCase {
   private final UrlNormalizationService urlNormalizationService;
 
   @Override
-  public boolean isRequestAllowed(RequestInfo requestInfo) {
+  public Mono<Boolean> isRequestAllowed(RequestInfo requestInfo) {
     // Normalizar el endpoint
     String normalizedEndpoint = urlNormalizationService.normalizeEndpoint(requestInfo.getEndpoint());
     RequestInfo normalizedRequestInfo = RequestInfo.builder()
@@ -32,35 +34,40 @@ public class RateLimitService implements RateLimitUseCase {
 
     log.debug("Checking rate limit for endpoint: {} and IP: {}", normalizedEndpoint, requestInfo.getClientIp());
 
-    // Obtener configuración desde el puerto de persistencia
-    RateLimitConfig config = persistencePort.getConfiguration(normalizedEndpoint);
+    // Obtener configuración desde el puerto de persistencia de forma reactiva
+    return persistencePort.getConfiguration(normalizedEndpoint)
+        .flatMap(config -> {
+          if (!config.isRateLimitEnabled()) {
+            log.debug("No rate limiting applied for endpoint: {} - returning true", normalizedEndpoint);
+            return Mono.just(true);
+          }
 
-    if (config == null || !config.isRateLimitEnabled()) {
-      log.debug("No rate limiting applied for endpoint: {} - returning true", normalizedEndpoint);
-      return true;
-    }
+          // Obtener contador actual de forma reactiva
+          return persistencePort.getCurrentRequestCount(normalizedRequestInfo)
+              .flatMap(currentCount -> {
+                log.debug("Current count for endpoint {} and IP {}: {}", normalizedEndpoint, requestInfo.getClientIp(),
+                    currentCount);
 
-    // Obtener contador actual
-    int currentCount = persistencePort.getCurrentRequestCount(normalizedRequestInfo);
-    log.debug("Current count for endpoint {} and IP {}: {}", normalizedEndpoint, requestInfo.getClientIp(),
-        currentCount);
+                if (config.hasReachedLimit(currentCount)) {
+                  log.warn("Rate limit exceeded for endpoint: {} and IP: {} ({} >= {})",
+                      normalizedEndpoint, requestInfo.getClientIp(), currentCount, config.getMaxRequests());
+                  return Mono.just(false);
+                }
 
-    if (config.hasReachedLimit(currentCount)) {
-      log.warn("Rate limit exceeded for endpoint: {} and IP: {} ({} >= {})",
-          normalizedEndpoint, requestInfo.getClientIp(), currentCount, config.getMaxRequests());
-      return false;
-    }
-
-    // Incrementar contador
-    persistencePort.incrementRequestCount(normalizedRequestInfo, config.getTimeWindowSeconds());
-    log.debug("Request allowed for endpoint: {} and IP: {} - count incremented", normalizedEndpoint,
-        requestInfo.getClientIp());
-
-    return true;
+                // Incrementar contador de forma reactiva
+                return persistencePort.incrementRequestCount(normalizedRequestInfo, config.getTimeWindowSeconds())
+                    .then(Mono.just(true))
+                    .doOnSuccess(result -> log.debug("Request allowed for endpoint: {} and IP: {} - count incremented",
+                        normalizedEndpoint, requestInfo.getClientIp()));
+              });
+        })
+        .defaultIfEmpty(true) // Si no hay configuración, permitir el request
+        .doOnError(error -> log.error("Error during rate limiting for endpoint: {} and IP: {}",
+            normalizedEndpoint, requestInfo.getClientIp(), error));
   }
 
   @Override
-  public void updateConfiguration(String endpoint, int maxRequests, int timeWindowSeconds, boolean enabled) {
+  public Mono<Void> updateConfiguration(String endpoint, int maxRequests, int timeWindowSeconds, boolean enabled) {
     String normalizedEndpoint = urlNormalizationService.normalizeEndpoint(endpoint);
 
     log.info("Updating rate limit configuration for endpoint: {} - maxRequests: {}, timeWindow: {}s, enabled: {}",
@@ -73,19 +80,35 @@ public class RateLimitService implements RateLimitUseCase {
         .enabled(enabled)
         .build();
 
-    persistencePort.saveConfiguration(config);
-
-    if (!enabled) {
-      // Limpiar datos existentes si se deshabilita
-      persistencePort.clearRateLimitData(normalizedEndpoint);
-      log.info("Cleared rate limit data for disabled endpoint: {}", normalizedEndpoint);
-    }
+    return persistencePort.saveConfiguration(config)
+        .then(Mono.defer(() -> {
+          if (!enabled) {
+            // Limpiar datos existentes si se deshabilita
+            log.info("Clearing rate limit data for disabled endpoint: {}", normalizedEndpoint);
+            return persistencePort.clearRateLimitData(normalizedEndpoint);
+          }
+          return Mono.empty();
+        }))
+        .doOnSuccess(
+            result -> log.info("Rate limit configuration updated successfully for endpoint: {}", normalizedEndpoint))
+        .doOnError(
+            error -> log.error("Error updating rate limit configuration for endpoint: {}", normalizedEndpoint, error));
   }
 
   @Override
-  public RateLimitConfig getConfiguration(String endpoint) {
+  public Mono<RateLimitConfig> getConfiguration(String endpoint) {
     String normalizedEndpoint = urlNormalizationService.normalizeEndpoint(endpoint);
     log.debug("Getting rate limit configuration for endpoint: {}", normalizedEndpoint);
-    return persistencePort.getConfiguration(normalizedEndpoint);
+
+    return persistencePort.getConfiguration(normalizedEndpoint)
+        .doOnSuccess(config -> {
+          if (config != null) {
+            log.debug("Configuration found for endpoint: {} - {}", normalizedEndpoint, config);
+          } else {
+            log.debug("No configuration found for endpoint: {}", normalizedEndpoint);
+          }
+        })
+        .doOnError(
+            error -> log.error("Error getting rate limit configuration for endpoint: {}", normalizedEndpoint, error));
   }
 }
